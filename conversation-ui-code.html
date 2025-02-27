@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HVAC Assistant</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #f5f5f5;
+    }
+    
+    .app-container {
+      max-width: 500px;
+      margin: 0 auto;
+      background-color: white;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    
+    .app-header {
+      background-color: #0056b3;
+      color: white;
+      padding: 15px;
+      text-align: center;
+      position: relative;
+    }
+    
+    .new-session-btn {
+      position: absolute;
+      right: 15px;
+      top: 15px;
+      background: none;
+      border: 1px solid white;
+      color: white;
+      border-radius: 4px;
+      padding: 5px 10px;
+      cursor: pointer;
+    }
+    
+    .conversation-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 15px;
+    }
+    
+    .message {
+      margin-bottom: 15px;
+      max-width: 80%;
+      padding: 10px 15px;
+      border-radius: 18px;
+      line-height: 1.4;
+    }
+    
+    .user {
+      background-color: #e3f2fd;
+      margin-left: auto;
+      border-bottom-right-radius: 4px;
+    }
+    
+    .assistant {
+      background-color: #f1f1f1;
+      margin-right: auto;
+      border-bottom-left-radius: 4px;
+    }
+    
+    .input-container {
+      padding: 10px;
+      background-color: #f9f9f9;
+      border-top: 1px solid #ddd;
+      display: flex;
+      align-items: center;
+    }
+    
+    #transcript {
+      flex: 1;
+      padding: 10px;
+      min-height: 20px;
+      border: 1px solid #ddd;
+      border-radius: 20px;
+      margin-right: 10px;
+      background-color: white;
+    }
+    
+    #mic-button {
+      background-color: #0056b3;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    #mic-button.listening {
+      background-color: #dc3545;
+      animation: pulse 1.5s infinite;
+    }
+    
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.1); }
+      100% { transform: scale(1); }
+    }
+    
+    .session-info {
+      font-size: 12px;
+      color: #666;
+      text-align: center;
+      padding: 5px;
+      background-color: #f9f9f9;
+    }
+    
+    .equipment-tag {
+      display: inline-block;
+      background-color: #e3f2fd;
+      color: #0056b3;
+      border-radius: 4px;
+      padding: 2px 6px;
+      margin-right: 5px;
+      font-size: 12px;
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+</head>
+<body>
+  <div class="app-container">
+    <div class="app-header">
+      <h1>HVAC Assistant</h1>
+      <button class="new-session-btn" onclick="resetSession()">New Session</button>
+    </div>
+    
+    <div class="session-info" id="session-info">
+      <!-- Equipment tags will be rendered here -->
+    </div>
+    
+    <div class="conversation-container" id="conversation-history">
+      <!-- Conversation messages will be rendered here -->
+    </div>
+    
+    <div class="input-container">
+      <div id="transcript"></div>
+      <button id="mic-button">
+        <i class="fas fa-microphone"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- Include your JavaScript files -->
+  <script src="voice-interface.js"></script>
+  <script src="session-tracking.js"></script>
+  
+  <script>
+    // Update session info display
+    function updateSessionInfoDisplay() {
+      const infoDiv = document.getElementById('session-info');
+      infoDiv.innerHTML = '';
+      
+      if (sessionContext.equipmentType) {
+        const equipTag = document.createElement('span');
+        equipTag.classList.add('equipment-tag');
+        equipTag.textContent = sessionContext.equipmentType;
+        infoDiv.appendChild(equipTag);
+      }
+      
+      if (sessionContext.modelNumber) {
+        const modelTag = document.createElement('span');
+        modelTag.classList.add('equipment-tag');
+        modelTag.textContent = `Model: ${sessionContext.modelNumber}`;
+        infoDiv.appendChild(modelTag);
+      }
+      
+      // Add error codes if any
+      if (sessionContext.identifiedIssues && sessionContext.identifiedIssues.length > 0) {
+        sessionContext.identifiedIssues.forEach(issue => {
+          if (issue.type === 'errorCode') {
+            const errorTag = document.createElement('span');
+            errorTag.classList.add('equipment-tag');
+            errorTag.style.backgroundColor = '#ffebee';
+            errorTag.style.color = '#c62828';
+            errorTag.textContent = `Error: ${issue.code}`;
+            infoDiv.appendChild(errorTag);
+          }
+        });
+      }
+    }
+    
+    // Restore conversation history from session
+    function restoreConversationHistory() {
+      if (sessionContext.conversationHistory && sessionContext.conversationHistory.length > 0) {
+        const historyDiv = document.getElementById('conversation-history');
+        historyDiv.innerHTML = '';
+        
+        sessionContext.conversationHistory.forEach(msg => {
+          const messageDiv = document.createElement('div');
+          messageDiv.classList.add('message', msg.sender);
+          
+          const contentP = document.createElement('p');
+          contentP.textContent = msg.text;
+          
+          messageDiv.appendChild(contentP);
+          historyDiv.appendChild(messageDiv);
+        });
+        
+        // Scroll to bottom
+        historyDiv.scrollTop = historyDiv.scrollHeight;
+      }
+    }
+    
+    // Override the existing addMessageToHistory function to update the display
+    const originalAddMessageToHistory = addMessageToHistory;
+    addMessageToHistory = function(sender, text) {
+      originalAddMessageToHistory(sender, text);
+      updateSessionInfoDisplay();
+    };
+    
+    // Initialize UI on page load
+    document.addEventListener('DOMContentLoaded', function() {
+      initializeSession();
+      restoreConversationHistory();
+      updateSessionInfoDisplay();
+      
+      // Add initial message if new session
+      if (!sessionContext.conversationHistory || sessionContext.conversationHistory.length === 0) {
+        addMessageToHistory('assistant', 'Hello! I\'m your HVAC assistant. How can I help you today?');
+      }
+    });
+  </script>
+</body>
+</html>
